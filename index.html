@@ -1,0 +1,84 @@
+<!-- index.html — GitHub Pages demo **APIsiz** çalışır -->
+<!-- Veri kaynağın yoksa bile grafik çizsin diye tarayıcıda rastgele OHLC üretiyoruz. -->
+<!-- Trading verisi gelince sadece API_BASE_URL doldur, otomatik gerçek veriye geçer. -->
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Borsa İstanbul Grafiği – Demo</title>
+  <!-- Tailwind → CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Axios (gerekecekse) -->
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js"></script>
+  <!-- Lightweight‑Charts -->
+  <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-200">
+  <div class="p-4 grid grid-cols-12 gap-4 min-h-screen">
+    <header class="col-span-12 flex items-center gap-2 mb-2">
+      <span class="text-teal-400 text-3xl">📊</span>
+      <h1 class="text-2xl font-bold">Borsa İstanbul Grafiği (Demo – APIsiz)</h1>
+    </header>
+
+    <aside id="sidebar" class="col-span-3 bg-slate-800 rounded-xl flex flex-col overflow-hidden"></aside>
+
+    <main class="col-span-9 bg-slate-800 rounded-xl relative overflow-hidden h-[calc(100vh-6.5rem)]">
+      <div id="loading" class="absolute inset-0 flex items-center justify-center text-sm hidden">Yükleniyor…</div>
+      <div id="error" class="absolute inset-0 flex items-center justify-center text-red-500 text-sm hidden"></div>
+      <div id="chart-container" class="w-full h-full"></div>
+    </main>
+  </div>
+
+  <script>
+    // ───────────────────────── Baz Veri ─────────────────────────
+    const BIST30=["AKBNK","ASELS","BIMAS","EKGYO","ENKAI","EREGL","FROTO","GARAN","GUBRF","HALKB","ISCTR","KCHOL","KRDMD","PETKM","PGSUS","SAHOL","SISE","SOKM","TCELL","THYAO","TKFEN","TOASO","TTKOM","TUPRS","VESTL","YKBNK","BRSAN","HEKTS","KONYA","ALARK"];
+    const BIST100=[...BIST30]; // demo için yeterli
+
+    const API_BASE_URL=""; // boş → rastgele demo veri kullanılır. Gerçek API varsa buraya yaz.
+
+    // Demo: 100 gün rastgele mum üret
+    function generateRandomData(days=100, start=100){
+      const data=[]; let t=Math.floor(Date.now()/1000)-days*86400; let price=start;
+      for(let i=0;i<days;i++){const open=price;const change=(Math.random()-0.5)*4;const close=open+change;const high=Math.max(open,close)+Math.random()*2;const low=Math.min(open,close)-Math.random()*2;data.push({time:t,open:round(open),high:round(high),low:round(low),close:round(close)});t+=86400;price=close;}return data;
+      function round(v){return Math.round(v*100)/100}
+    }
+
+    // ───────────────────────── UI Helpers ─────────────────────────
+    const qs=q=>document.querySelector(q);
+    const sidebar=qs('#sidebar');
+    let activeTab='bist30';
+    let activeSym='AKBNK';
+    const chartContainer=qs('#chart-container');
+    let chart,series;
+
+    function buildSidebar(){
+      sidebar.innerHTML='';
+      const tabBar=document.createElement('div');
+      tabBar.append(makeTab('BIST‑30','bist30'),makeTab('BIST‑100','bist100'));
+      sidebar.append(tabBar);
+      const listWrap=document.createElement('div');
+      listWrap.className='overflow-y-auto h-[calc(100vh-11rem)] pr-1 space-y-1';
+      (activeTab==='bist30'?BIST30:BIST100).forEach(s=>listWrap.append(makeSymBtn(s)));
+      sidebar.append(listWrap);
+    }
+    const makeTab=(label,val)=>{const b=document.createElement('button');b.textContent=label;b.className=`flex-1 py-2 text-sm font-semibold ${val===activeTab?'bg-teal-600 text-white':'bg-gray-700 hover:bg-gray-600'}`;b.onclick=()=>{activeTab=val;buildSidebar();};return b;};
+    const makeSymBtn=s=>{const b=document.createElement('button');b.textContent=s;b.className=`w-full text-left font-mono py-1 px-2 rounded ${s===activeSym?'bg-teal-600 text-white':'hover:bg-gray-700'}`;b.onclick=()=>{activeSym=s;buildSidebar();loadData();};return b;};
+
+    // ───────────────────────── Chart Setup ─────────────────────────
+    function initChart(){chartContainer.innerHTML='';chart=LightweightCharts.createChart(chartContainer,{layout:{background:{color:'#0f172a'},textColor:'#cbd5e1'},grid:{vertLines:{color:'#1e293b'},horzLines:{color:'#1e293b'}},width:chartContainer.clientWidth,height:chartContainer.clientHeight});series=chart.addCandlestickSeries({upColor:'#16a34a',downColor:'#dc2626'});window.addEventListener('resize',()=>chart.applyOptions({width:chartContainer.clientWidth}));}
+
+    function loadData(){qs('#loading').classList.remove('hidden');qs('#error').classList.add('hidden');
+      if(!API_BASE_URL){const demo=generateRandomData();series.setData(demo);chart.timeScale().fitContent();qs('#loading').classList.add('hidden');return;}
+      axios.get(API_BASE_URL+activeSym)
+        .then(r=>{series.setData(r.data);chart.timeScale().fitContent();})
+        .catch(e=>{console.error(e);qs('#error').textContent='Veri çekilemedi';qs('#error').classList.remove('hidden');})
+        .finally(()=>qs('#loading').classList.add('hidden'));
+    }
+
+    // ───────────────────────── Init ─────────────────────────
+    buildSidebar();initChart();loadData();
+  </script>
+</body>
+</html>
